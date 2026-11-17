@@ -120,6 +120,10 @@ public class WorthManager {
 
     private static final DirectWorthData NULL_DIRECT_WORTH = new DirectWorthData(-1.0, "", "", "");
 
+    private record WorthLorePatternCache(String format, Pattern pattern) {}
+
+    private volatile WorthLorePatternCache worthLorePatternCache;
+
     private record WorthCacheKey(
             Material material,
             PotionType potionType,
@@ -130,7 +134,11 @@ public class WorthManager {
                 return new WorthCacheKey(null, null, java.util.Collections.emptyMap());
             }
             PotionType potionType = null;
-            if (item.getItemMeta() instanceof PotionMeta meta) {
+            // only these four carry potion meta, and fetching meta copies it, so skip that for the rest
+            Material type = item.getType();
+            if ((type == Material.POTION || type == Material.SPLASH_POTION
+                    || type == Material.LINGERING_POTION || type == Material.TIPPED_ARROW)
+                    && item.getItemMeta() instanceof PotionMeta meta) {
                 potionType = meta.getBasePotionType();
             }
             java.util.Map<Enchantment, java.lang.Integer> enchants = java.util.Collections.emptyMap();
@@ -592,6 +600,12 @@ public class WorthManager {
 
     public ItemStack stripWorthDisplay(ItemStack item) {
         if (item == null || item.getType().isAir()) {
+            return item;
+        }
+
+        // an item with no meta has no lore and no worth tag, so there is nothing to strip. checking
+        // this first skips a full meta copy for every plain item on each click and pickup
+        if (!item.hasItemMeta()) {
             return item;
         }
 
@@ -1520,8 +1534,21 @@ public class WorthManager {
         return format;
     }
 
+    // the pattern only changes when the configured format does, so it is compiled once per format
+    // instead of once per item, which is what every pickup, click and inventory packet used to do
     private Pattern buildWorthLorePattern() {
-        String format = stripColorCodes(getWorthLoreFormat());
+        String rawFormat = getWorthLoreFormat();
+        WorthLorePatternCache cached = worthLorePatternCache;
+        if (cached != null && cached.format().equals(rawFormat)) {
+            return cached.pattern();
+        }
+        Pattern compiled = compileWorthLorePattern(rawFormat);
+        worthLorePatternCache = new WorthLorePatternCache(rawFormat, compiled);
+        return compiled;
+    }
+
+    private Pattern compileWorthLorePattern(String rawFormat) {
+        String format = stripColorCodes(rawFormat);
         List<String> placeholders = List.of(
                 "%unit_price%", "${unit_price}", "{unit_price}",
                 "%unit_price_formatted%", "${unit_price_formatted}", "{unit_price_formatted}",
