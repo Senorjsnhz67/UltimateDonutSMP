@@ -23,6 +23,14 @@ public class ColorUtils {
     );
     private static final Pattern TAGGED_HEX_PATTERN = Pattern.compile("<#([A-Fa-f0-9]{6})>");
     private static final Pattern TAGGED_HEX_CLOSE_PATTERN = Pattern.compile("</#([A-Fa-f0-9]{6})>");
+    private static final Pattern STRIP_AMP_HEX = Pattern.compile("&#[A-Fa-f0-9]{6}");
+    private static final Pattern STRIP_BRACE_HEX = Pattern.compile("\\{#[A-Fa-f0-9]{6}\\}");
+    private static final Pattern STRIP_TAG_HEX = Pattern.compile("<#?[A-Fa-f0-9]{6}>");
+    private static final Pattern STRIP_TAG_HEX_CLOSE = Pattern.compile("</#?[A-Fa-f0-9]{6}>");
+    private static final Pattern STRIP_AMP_X_HEX = Pattern.compile("&x#[A-Fa-f0-9]{6}");
+    private static final Pattern STRIP_BARE_HEX = Pattern.compile("#[A-Fa-f0-9]{6}");
+    private static final Pattern STRIP_SECTION_HEX = Pattern.compile("(?i)\\u00A7x(?:\\u00A7[0-9A-F]){6}");
+    private static final Pattern STRIP_LEGACY = Pattern.compile("[\\u00A7&][0-9A-FK-ORa-fk-or]");
 
     private static boolean hasPAPI = false;
 
@@ -190,15 +198,23 @@ public class ColorUtils {
             return "";
         }
 
+        // every pattern below needs one of these marker characters, so plain text is already clean
+        if (text.indexOf('&') < 0 && text.indexOf('#') < 0 && text.indexOf('{') < 0
+                && text.indexOf('<') < 0 && text.indexOf(SECTION_CHAR) < 0) {
+            return text;
+        }
+
         String base = text.indexOf('<') >= 0 ? stripMiniMessageTags(text) : text;
-        return base.replaceAll("&#[A-Fa-f0-9]{6}", "")
-                .replaceAll("\\{#[A-Fa-f0-9]{6}\\}", "")
-                .replaceAll("<#?[A-Fa-f0-9]{6}>", "")
-                .replaceAll("</#?[A-Fa-f0-9]{6}>", "")
-                .replaceAll("&x#[A-Fa-f0-9]{6}", "")
-                .replaceAll("#[A-Fa-f0-9]{6}", "")
-                .replaceAll("(?i)\\u00A7x(?:\\u00A7[0-9A-F]){6}", "")
-                .replaceAll("[\\u00A7&][0-9A-FK-ORa-fk-or]", "");
+        // String.replaceAll compiles a new Pattern on every call, and this runs for every lore line
+        // of every item in every inventory packet, so the patterns are compiled once
+        base = STRIP_AMP_HEX.matcher(base).replaceAll("");
+        base = STRIP_BRACE_HEX.matcher(base).replaceAll("");
+        base = STRIP_TAG_HEX.matcher(base).replaceAll("");
+        base = STRIP_TAG_HEX_CLOSE.matcher(base).replaceAll("");
+        base = STRIP_AMP_X_HEX.matcher(base).replaceAll("");
+        base = STRIP_BARE_HEX.matcher(base).replaceAll("");
+        base = STRIP_SECTION_HEX.matcher(base).replaceAll("");
+        return STRIP_LEGACY.matcher(base).replaceAll("");
     }
 
     public static boolean hasPAPI() {
