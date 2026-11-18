@@ -1213,4 +1213,8 @@ COMMANDS:
   # Determines whether Help is enabled or disabled. Available options: true, false
   HELP: true
   # Determines whether Servers is enabled or disabled. Available options: true, false
-  SERVERS: true
+  SERVERS: false
+  SPAWNSTASH: false
+  SPAWN-STASH: false
+  SPAWN_STASH: false
+  
